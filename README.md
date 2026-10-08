@@ -16,6 +16,9 @@ The **"netcdf_join_dataframes.R"** joins the ferrybox and logger csv data frame 
 **"netcdf_scatter_datax_vs_datay.R"** creates a scatterplot from the joined dataframes from the parameters specfied and **"netcdf_scatter_station_plot.R"** creates scatterplot from a single dataframes from two specified parameters (could be ferrybox salinity vs chlorophyll). 
 **"netcdf_tile_plot.R"** creates a Hovmöller style plot of ferrybox measurements. The plot illustrates the latitude and y-axis, data at x-axis and plot fill is the measurement value of specified parameter. 
 
+# GALAXY
+The workflow is published on the Galaxy platform and a data-to-knowledge package explaining how the workflow runs is available at https://zenodo.org/records/22868890.
+
 ## Docker
 
 The environment for the R scripts can also be created using docker
