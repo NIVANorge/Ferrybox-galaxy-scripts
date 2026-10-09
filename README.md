@@ -22,7 +22,12 @@ The workflow is published on the Galaxy platform and a data-to-knowledge package
 
 ## Docker
 
-The environment for the R scripts can also be created using docker
+The environment for the R scripts can also be created using docker.
+
+This repo is intended for:
+- local execution via Docker
+- browser-based interactive use via MyBinder
+- workflow use via Galaxy
 
 ```bash
 today=$(date '+%Y%m%d')
@@ -45,7 +50,7 @@ docker run -it --entrypoint /bin/bash ferry-rscripts${today}
 
 To run a single script, with input parameters:
 
-(When removing the trailing comments, make sure to remove all trailing whitespace, so that the backslash is the last character on the line. Otherwise subsequent lines will not be passed on to the dock[...]
+(When removing the trailing comments, make sure to remove all trailing whitespace, so that the backslash is the last character on the line. Otherwise subsequent lines will not be passed on to the docker command.)
 
 ```bash
 # Example: netcdf_extract_fb_data.R
@@ -341,290 +346,27 @@ date; docker run \
 ```
 
 
+## MyBinder / Virtual lab
+
+This repository can also be launched as a browser-based virtual lab with MyBinder.
+This is useful when you want to explore the R scripts interactively without installing
+R and the required dependencies locally.
+
+To use it:
+
+1. Open the Binder URL for this repository:
+   https://mybinder.org/v2/gh/NIVANorge/Ferrybox-galaxy-scripts/main
+2. Wait for the environment to build.
+3. Start RStudio or the relevant interactive tooling from the launched environment.
+
+The MyBinder setup is intended for interactive analysis and exploration, while the Docker
+instructions above are intended for users who want to run the scripts locally in a container.
+
 ## Pygeoapi / OGC HTTP API
 
-These scripts can be exposed as OGC API Processes via Pygeoapi, allowing remote access to ferrybox data extraction and analysis functions through HTTP endpoints.
+The Pygeoapi / OGC API service layer is maintained in the companion repository for the deployed web service setup:
 
-### Setup Instructions
+https://github.com/NIVANorge/niva-aquainfra
 
-To deploy these scripts as OGC API Processes on your Pygeoapi instance, follow these steps:
+This repository focuses on the Ferrybox R scripts, local execution, and interactive access via Docker and MyBinder. The web-service deployment and JSON metadata files used for OGC API process endpoints are kept in the companion repository where the service is actively deployed and maintained.
 
-#### 1. Prerequisites
-- A Pygeoapi instance installed and running (see [Pygeoapi documentation](https://pygeoapi.io/))
-- Docker image built with your scripts (see Docker section above)
-- Example: [AquaINFRA Pygeoapi instance](https://example-server-url/pygeoapi)
-
-#### 2. Create Process Files
-
-For **each script**, you need to create:
-- **Python process file** (e.g., `netcdf_extract_fb_data.py`) in `pygeoapi/plugin/process/`
-- **JSON metadata file** (e.g., `netcdf_extract_fb_data.json`) with OGC API Process metadata
-
-Example structure for `netcdf_extract_fb_data.py`:
-
-```python
-import subprocess
-from pygeoapi.process.base import BaseProcessor
-
-class NetcdfExtractFbDataProcessor(BaseProcessor):
-    """Extracts ferrybox measurements from THREDDS server"""
-    
-    def __init__(self):
-        super().__init__()
-        self.metadata = {
-            'version': '1.0.0',
-            'title': 'FerryBox Data Extraction',
-            'description': 'Extract ferrybox measurements (temperature, salinity, etc.) from THREDDS',
-            'keywords': ['ferrybox', 'oceanography', 'extraction'],
-            'links': [
-                {'type': 'text/html', 
-                 'rel': 'canonical',
-                 'title': 'Information',
-                 'href': 'https://github.com/NIVANorge/Ferrybox-galaxy-scripts'}
-            ],
-            'inputs': {
-                'url_thredds': {
-                    'title': 'THREDDS URL',
-                    'description': 'URL to the THREDDS dataset',
-                    'schema': {'type': 'string'},
-                    'minOccurs': 1,
-                    'maxOccurs': 1
-                },
-                'output_csv': {
-                    'title': 'Output CSV path',
-                    'description': 'Path for output CSV file',
-                    'schema': {'type': 'string'},
-                    'minOccurs': 1,
-                    'maxOccurs': 1
-                },
-                'parameters': {
-                    'title': 'Parameters',
-                    'description': 'Comma-separated list (temperature,salinity,chlorophyll,turbidity,fdom,oxygen_sat)',
-                    'schema': {'type': 'string'},
-                    'minOccurs': 0,
-                    'maxOccurs': 1
-                },
-                'start_date': {
-                    'title': 'Start date',
-                    'description': 'Start date (YYYY-MM-DD)',
-                    'schema': {'type': 'string', 'format': 'date'},
-                    'minOccurs': 1,
-                    'maxOccurs': 1
-                },
-                'end_date': {
-                    'title': 'End date',
-                    'description': 'End date (YYYY-MM-DD)',
-                    'schema': {'type': 'string', 'format': 'date'},
-                    'minOccurs': 1,
-                    'maxOccurs': 1
-                },
-                'bbox': {
-                    'title': 'Bounding box',
-                    'description': 'Bounding box [minLon, maxLon, minLat, maxLat] or null',
-                    'schema': {'type': 'array', 'items': {'type': 'number'}},
-                    'minOccurs': 0,
-                    'maxOccurs': 1
-                }
-            },
-            'outputs': {
-                'result': {
-                    'title': 'CSV output',
-                    'description': 'Extracted data as CSV',
-                    'schema': {'type': 'object', 'contentMediaType': 'text/csv'}
-                }
-            }
-        }
-
-    def execute(self, data):
-        """Execute the process"""
-        # Build Docker command from inputs
-        cmd = [
-            'docker', 'run', '-v', './testresults:/out:rw',
-            '-e', 'SCRIPT=netcdf_extract_fb_data.R',
-            'ferry-rscripts:latest',
-            data['url_thredds'],
-            data['output_csv'],
-            data.get('parameters', 'null'),
-            data.get('start_date', ''),
-            data.get('end_date', ''),
-        ]
-        
-        # Add bbox if provided
-        if data.get('bbox'):
-            cmd.extend(data['bbox'])
-        else:
-            cmd.extend(['null', 'null', 'null', 'null'])
-        
-        # Execute and return results
-        subprocess.run(cmd, check=True)
-        return {'result': data['output_csv']}
-
-    def __repr__(self):
-        return f'<NetcdfExtractFbDataProcessor> {self.metadata["title"]}'
-```
-
-Example `netcdf_extract_fb_data.json` metadata:
-
-```json
-{
-  "title": "FerryBox Data Extraction",
-  "description": "Extract ferrybox measurements (temperature, salinity, chlorophyll, turbidity, fdom, oxygen_sat) from THREDDS server",
-  "version": "1.0.0",
-  "keywords": ["ferrybox", "oceanography", "data extraction", "THREDDS"],
-  "links": [
-    {
-      "type": "text/html",
-      "rel": "canonical",
-      "title": "Repository",
-      "href": "https://github.com/NIVANorge/Ferrybox-galaxy-scripts"
-    }
-  ],
-  "inputs": {
-    "url_thredds": {
-      "title": "THREDDS URL",
-      "description": "URL to the THREDDS FerryBox dataset",
-      "schema": {"type": "string", "default": "https://thredds.niva.no/thredds/dodsC/datasets/nrt/color_fantasy.nc"}
-    },
-    "output_csv": {
-      "title": "Output CSV Path",
-      "description": "Path where output CSV will be saved",
-      "schema": {"type": "string", "default": "/out/ferrybox.csv"}
-    },
-    "parameters": {
-      "title": "Parameters",
-      "description": "Comma-separated parameter names (temperature, salinity, chlorophyll, turbidity, fdom, oxygen_sat)",
-      "schema": {"type": "string", "default": "temperature,salinity,chlorophyll"}
-    },
-    "start_date": {
-      "title": "Start Date",
-      "description": "Start date in YYYY-MM-DD format",
-      "schema": {"type": "string", "format": "date"}
-    },
-    "end_date": {
-      "title": "End Date",
-      "description": "End date in YYYY-MM-DD format",
-      "schema": {"type": "string", "format": "date"}
-    },
-    "bbox": {
-      "title": "Bounding Box",
-      "description": "Optional bounding box as [minLon, maxLon, minLat, maxLat]",
-      "schema": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4}
-    }
-  },
-  "outputs": {
-    "result": {
-      "title": "CSV Result",
-      "description": "Extracted ferrybox data as CSV file",
-      "schema": {"type": "object", "contentMediaType": "text/csv"}
-    }
-  }
-}
-```
-
-#### 3. Register Processes in Pygeoapi Config
-
-Add to `pygeoapi-config.yml`:
-
-```yaml
-resources:
-  ferrybox-extract-data:
-    type: process
-    processor:
-      name: NetcdfExtractFbDataProcessor
-
-  ferrybox-extract-logger:
-    type: process
-    processor:
-      name: NetcdfLoggerExtractProcessor
-
-  ferrybox-assessment-area:
-    type: process
-    processor:
-      name: NetcdfAssessmentAreaProcessor
-
-  ferrybox-join-dataframes:
-    type: process
-    processor:
-      name: NetcdfJoinDataframesProcessor
-
-  ferrybox-scatter-plot:
-    type: process
-    processor:
-      name: NetcdfScatterPlotProcessor
-
-  ferrybox-tile-plot:
-    type: process
-    processor:
-      name: NetcdfTilePlotProcessor
-```
-
-#### 4. Register Processors in `pygeoapi/plugin.py`
-
-```python
-'process': {
-    'NetcdfExtractFbDataProcessor': 'pygeoapi.process.niva.netcdf_extract_fb_data.NetcdfExtractFbDataProcessor',
-    'NetcdfLoggerExtractProcessor': 'pygeoapi.process.niva.netcdf_logger_extract.NetcdfLoggerExtractProcessor',
-    'NetcdfAssessmentAreaProcessor': 'pygeoapi.process.niva.netcdf_assessment_area.NetcdfAssessmentAreaProcessor',
-    'NetcdfJoinDataframesProcessor': 'pygeoapi.process.niva.netcdf_join_dataframes.NetcdfJoinDataframesProcessor',
-    'NetcdfScatterPlotProcessor': 'pygeoapi.process.niva.netcdf_scatter_plot.NetcdfScatterPlotProcessor',
-    'NetcdfTilePlotProcessor': 'pygeoapi.process.niva.netcdf_tile_plot.NetcdfTilePlotProcessor',
-}
-```
-
-#### 5. Install and Deploy
-
-```bash
-# Install pygeoapi with your plugins
-source venv/bin/activate
-cd pygeoapi
-pip install -e .
-
-# Generate OpenAPI spec
-export PYGEOAPI_CONFIG=pygeoapi-config.yml
-export PYGEOAPI_OPENAPI=pygeoapi-openapi.yml
-pygeoapi openapi generate $PYGEOAPI_CONFIG --output-file $PYGEOAPI_OPENAPI
-
-# Restart pygeoapi
-sudo systemctl restart pygeoapi  # or your deployment method
-```
-
-#### 6. Test the API
-
-```bash
-# List available processes
-curl https://your-pygeoapi-instance.com/pygeoapi/processes
-
-# Execute a process
-curl -X POST https://your-pygeoapi-instance.com/pygeoapi/processes/ferrybox-extract-data/execution \
-  --header 'Content-Type: application/json' \
-  --data '{
-    "inputs": {
-      "url_thredds": "https://thredds.niva.no/thredds/dodsC/datasets/nrt/color_fantasy.nc",
-      "output_csv": "/out/ferrybox_data.csv",
-      "parameters": "temperature,salinity,chlorophyll",
-      "start_date": "2023-01-01",
-      "end_date": "2023-12-31",
-      "bbox": [58.5, 9.5, 59.9, 11.9]
-    }
-  }'
-
-# Async request (recommended for long-running processes)
-curl -i -X POST https://your-pygeoapi-instance.com/pygeoapi/processes/ferrybox-extract-data/execution \
-  --header 'Content-Type: application/json' \
-  --header 'Prefer: respond-async' \
-  --data '{...}'
-```
-
-### Web API Service URL
-
-Once deployed, update the URL below with your Pygeoapi instance:
-
-**Web API Service:** *(To be added after deployment)*
-- Base URL: `https://your-pygeoapi-instance.com/pygeoapi`
-- Processes endpoint: `https://your-pygeoapi-instance.com/pygeoapi/processes`
-
-### References
-
-- [OGC API Processes Specification](https://ogcapi.ogc.org/processes/)
-- [Pygeoapi Documentation](https://docs.pygeoapi.io/)
-- [Example: AquaINFRA Pygeoapi Instance](https://github.com/NIVANorge/niva-aquainfra)
