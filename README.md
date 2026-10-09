@@ -1,6 +1,6 @@
 # Ferrybox R scripts
 
-[[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/NIVANorge/niva-aquainfra/main?urlpath=rstudio)](https://mybinder.org/v2/gh/NIVANorge/Ferrybox-galaxy-scripts/main)
+https://mybinder.org/v2/gh/NIVANorge/Ferrybox-galaxy-scripts/main
 
 The following scripts extract ferrybox measurements (https://thredds.niva.no/thredds/dodsC/datasets/nrt/color_fantasy.nc) and river logger measurements (https://thredds.niva.no/thredds/dodsC/datasets/loggers/glomma/baterod.nc) from NIVA thredds for marine and freshwater parameters.   
 
